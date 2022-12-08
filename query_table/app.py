@@ -41,6 +41,9 @@ namespace = 'canvas'
 env = os.environ.get('ENV', 'dev')
 file_format = Format(os.environ.get('FILE_FORMAT', 'csv'))
 
+api_key_param_path = os.environ.get('API_KEY_PARAM_PATH', f'/{env}/canvas_data_2/dap_api_key')
+api_base_url = os.environ.get('API_BASE_URL', 'https://api-gateway.instructure.com')
+
 metrics = Metrics()
 metrics.set_default_dimensions(environment=env)
 
@@ -49,9 +52,9 @@ metrics.set_default_dimensions(environment=env)
 @event_source(data_class=SQSEvent)
 def lambda_handler(event: SQSEvent, context: LambdaContext):
 
-    params = ssm_provider.get_multiple(f'/{env}/canvas_data_2', max_age=300, decrypt=True)
+    dap_api_key = ssm_provider.get(api_key_param_path, max_age=600, decrypt=True)
 
-    with DAPClient(base_url=params['dap_api_url'], api_key=params['dap_api_key']) as dc:
+    with DAPClient(base_url=api_base_url, api_key=dap_api_key) as dc:
 
         for record in event.records:
             table = record.body

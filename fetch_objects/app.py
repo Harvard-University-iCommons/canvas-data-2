@@ -47,17 +47,15 @@ s3_bucket = s3.Bucket(bucket_name)
 namespace = 'canvas'
 env = os.environ.get('ENV', 'dev')
 
-chunk_size = 1024*1024*8
-
 metrics = Metrics()
 metrics.set_default_dimensions(environment=env)
+
+chunk_size = 1024*1024*8
 
 
 @logger.inject_lambda_context(log_event=True)
 @event_source(data_class=SQSEvent)
 def lambda_handler(event: SQSEvent, context: LambdaContext):
-
-    params = ssm_provider.get_multiple(f'/{env}/canvas_data_2', max_age=300, decrypt=True)
 
     for record in event.records:
         message = json.loads(record.body)
@@ -85,45 +83,3 @@ def lambda_handler(event: SQSEvent, context: LambdaContext):
 
         fetch_objects_message = sqs.Message(fetch_objects_queue_url, record.receipt_handle)
         fetch_objects_message.delete()
-
-
-
-def put_job(table: str, job):
-
-    item = {
-        'id': job.id,
-        'status': str(job.status),
-    }
-    item['table_name'] = table
-    if issubclass(type(job), CompleteJob):
-        simple_objects = []
-        objects = job.objects
-        for o in objects:
-            simple_objects.append(o.id)
-        if job.expires_at:
-            item['expires_at'] = job.expires_at.isoformat()
-        item['objects'] = simple_objects
-        item['schema_version'] = job.schema_version
-    if type(job) is CompleteSnapshotJob:
-        item['job_type'] = 'snapshot'
-        # convert to an integer (milliseconds) that DynamoDB can store
-        at = job.at
-        ts = datetime.timestamp(at)
-        tms = int(ts*1000.0)
-        logger.debug(f'at: {at} ts: {ts} tms: {tms}')
-        item['at'] = int(datetime.timestamp(job.at)*1000.0)
-    elif type(job) is CompleteIncrementalJob:
-        item['job_type'] = 'incremental'
-        # convert to an integer (milliseconds) that DynamoDB can store
-        at = job.until
-        ts = datetime.timestamp(at)
-        tms = int(ts*1000.0)
-        logger.debug(f'at: {at} ts: {ts} tms: {tms}')
-        item['at'] = int(datetime.timestamp(job.until)*1000.0)
-        item['since'] =  job.since.isoformat()
-        item['until'] = job.until.isoformat()
-
-    response = ddb_table.put_item(
-        Item=item
-    )
-    logger.debug(response)

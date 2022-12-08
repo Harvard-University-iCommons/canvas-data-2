@@ -44,6 +44,13 @@ The first command will build the source of your application. The second command 
 * **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
 * **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
 
+## Configuration
+
+In order for the application to use the DAP API, you will need to provide your API key. The application uses AWS SSM Param Store to securely store the key and retrieve it at runtime. To store your key:
+```
+aws ssm put-parameter --name '/<environment>/canvas_data_2/dap_api_key' --type SecureString --value '<your key here>'
+```
+where `<environment>` is either `dev` or `prod`. You can also use the AWS SSM console to manage the parameter.
 
 ## Cleanup
 
