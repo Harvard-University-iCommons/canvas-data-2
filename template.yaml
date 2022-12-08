@@ -1,0 +1,240 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  canvas-data-2
+
+  Sample SAM Template for canvas-data-2
+
+Parameters:
+  EnvironmentParameter:
+    Type: String
+    AllowedValues:
+      - "dev"
+      - "prod"
+    Default: "dev"
+
+  FileFormatParameter:
+    Type: String
+    AllowedValues:
+      - 'csv'
+      - 'tsv'
+      - 'jsonl'
+      - 'parquet'
+    Default: 'csv'
+
+Resources:
+
+  CanvasData2Bucket:
+    Type: AWS::S3::Bucket
+
+  JobTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: table_name
+          AttributeType: S
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: at
+          AttributeType: N
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: table_name
+          KeyType: HASH
+        - AttributeName: id
+          KeyType: RANGE
+      LocalSecondaryIndexes:
+        - IndexName: at-index
+          KeySchema:
+            - AttributeName: table_name
+              KeyType: HASH
+            - AttributeName: at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  QueryTableQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      ReceiveMessageWaitTimeSeconds: 15
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      VisibilityTimeout: 120
+
+  JobStatusQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: 60 # don't check more often than once a minute
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      VisibilityTimeout: 60
+
+  FetchObjectsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      ReceiveMessageWaitTimeSeconds: 15
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      VisibilityTimeout: 240
+
+
+  RefreshFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: refresh/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Events:
+        ScheduleEvent:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "rate(6 hours)"
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt QueryTableQueue.QueueName
+        - SSMParameterReadPolicy:
+            ParameterName: !Sub '${EnvironmentParameter}/canvas_data_2*'
+      Environment:
+        Variables:
+          DDB_TABLE_NAME: !Ref JobTable
+          QUERY_TABLE_QUEUE_URL: !Ref QueryTableQueue
+          ENV: !Ref EnvironmentParameter
+          POWERTOOLS_METRICS_NAMESPACE: canvas-data-2
+          POWERTOOLS_SERVICE_NAME: refresh
+          LOG_LEVEL: DEBUG
+      Timeout: 120
+      MemorySize: 256
+
+  QueryTableFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: query_table/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt QueryTableQueue.Arn
+            BatchSize: 1
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt QueryTableQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt JobStatusQueue.QueueName
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobTable
+        - SSMParameterReadPolicy:
+            ParameterName: !Sub '${EnvironmentParameter}/canvas_data_2*'
+      Environment:
+        Variables:
+          DDB_TABLE_NAME: !Ref JobTable
+          ENV: !Ref EnvironmentParameter
+          QUERY_TABLE_QUEUE_URL: !Ref QueryTableQueue
+          JOB_STATUS_QUEUE_URL: !Ref JobStatusQueue
+          POWERTOOLS_METRICS_NAMESPACE: canvas-data-2
+          POWERTOOLS_SERVICE_NAME: query-table
+          LOG_LEVEL: DEBUG
+          FILE_FORMAT: !Ref FileFormatParameter
+      Timeout: 120
+      MemorySize: 256
+
+
+  JobStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: job_status/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt JobStatusQueue.Arn
+            BatchSize: 1
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt JobStatusQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt JobStatusQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt FetchObjectsQueue.QueueName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobTable
+        - SSMParameterReadPolicy:
+            ParameterName: !Sub '${EnvironmentParameter}/canvas_data_2*'
+      Environment:
+        Variables:
+          DDB_TABLE_NAME: !Ref JobTable
+          ENV: !Ref EnvironmentParameter
+          JOB_STATUS_QUEUE_URL: !GetAtt JobStatusQueue.QueueUrl
+          FETCH_OBJECTS_QUEUE_URL: !GetAtt FetchObjectsQueue.QueueUrl
+          POWERTOOLS_METRICS_NAMESPACE: canvas-data-2
+          POWERTOOLS_SERVICE_NAME: job-status
+          LOG_LEVEL: DEBUG
+      Timeout: 60
+
+  FetchObjectsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: fetch_objects/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FetchObjectsQueue.Arn
+            BatchSize: 1
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !Ref FetchObjectsQueue
+        - S3CrudPolicy:
+            BucketName: !Ref CanvasData2Bucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobTable
+        - SSMParameterReadPolicy:
+            ParameterName: !Sub '${EnvironmentParameter}/canvas_data_2*'
+      Environment:
+        Variables:
+          DDB_TABLE_NAME: !Ref JobTable
+          ENV: !Ref EnvironmentParameter
+          FETCH_OBJECTS_QUEUE_URL: !GetAtt FetchObjectsQueue.QueueUrl
+          BUCKET_NAME: !Ref CanvasData2Bucket
+          POWERTOOLS_METRICS_NAMESPACE: canvas-data-2
+          POWERTOOLS_SERVICE_NAME: fetch-objects
+          LOG_LEVEL: INFO
+      Timeout: 240
+      MemorySize: 512
+
+
+# Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  # HelloWorldApi:
+  #   Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+  #   Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+  # HelloWorldFunction:
+  #   Description: "Hello World Lambda Function ARN"
+  #   Value: !GetAtt HelloWorldFunction.Arn
+  # HelloWorldFunctionIamRole:
+  #   Description: "Implicit IAM Role created for Hello World function"
+  #   Value: !GetAtt HelloWorldFunctionRole.Arn

@@ -1,0 +1,4 @@
+aws-lambda-powertools
+requests
+boto3
+instructure-dap-client
