@@ -22,6 +22,28 @@ Parameters:
       - 'parquet'
     Default: 'csv'
 
+  ApiKeyParamPath:
+    Type: String
+    Default: ''
+    Description: the AWS SSM param store path where the DAP API key is stored - leave blank to use the default value of /<env>/canvas_data_2/dap_api_key.
+
+  LogLevel:
+    Type: String
+    Default: INFO
+    AllowedValues:
+      - 'DEBUG'
+      - 'INFO'
+      - 'WARN'
+      - 'ERROR'
+
+
+
+Conditions:
+  OverrideApiKeyParamPath: !Not
+    - !Equals
+      - !Ref ApiKeyParamPath
+      - ''
+
 Resources:
 
   CanvasData2Bucket:
@@ -112,7 +134,8 @@ Resources:
           ENV: !Ref EnvironmentParameter
           POWERTOOLS_METRICS_NAMESPACE: canvas-data-2
           POWERTOOLS_SERVICE_NAME: refresh
-          LOG_LEVEL: DEBUG
+          LOG_LEVEL: !Ref LogLevel
+          API_KEY_PARAM_PATH: !If [OverrideApiKeyParamPath, !Ref ApiKeyParamPath, !Sub '/${EnvironmentParameter}/canvas_data_2/dap_api_key']
       Timeout: 120
       MemorySize: 256
 
@@ -147,8 +170,9 @@ Resources:
           JOB_STATUS_QUEUE_URL: !Ref JobStatusQueue
           POWERTOOLS_METRICS_NAMESPACE: canvas-data-2
           POWERTOOLS_SERVICE_NAME: query-table
-          LOG_LEVEL: DEBUG
+          LOG_LEVEL: !Ref LogLevel
           FILE_FORMAT: !Ref FileFormatParameter
+          API_KEY_PARAM_PATH: !If [OverrideApiKeyParamPath, !Ref ApiKeyParamPath, !Sub '/${EnvironmentParameter}/canvas_data_2/dap_api_key']
       Timeout: 120
       MemorySize: 256
 
@@ -186,7 +210,8 @@ Resources:
           FETCH_OBJECTS_QUEUE_URL: !GetAtt FetchObjectsQueue.QueueUrl
           POWERTOOLS_METRICS_NAMESPACE: canvas-data-2
           POWERTOOLS_SERVICE_NAME: job-status
-          LOG_LEVEL: DEBUG
+          LOG_LEVEL: !Ref LogLevel
+          API_KEY_PARAM_PATH: !If [OverrideApiKeyParamPath, !Ref ApiKeyParamPath, !Sub '/${EnvironmentParameter}/canvas_data_2/dap_api_key']
       Timeout: 60
 
   FetchObjectsFunction:
@@ -220,7 +245,7 @@ Resources:
           BUCKET_NAME: !Ref CanvasData2Bucket
           POWERTOOLS_METRICS_NAMESPACE: canvas-data-2
           POWERTOOLS_SERVICE_NAME: fetch-objects
-          LOG_LEVEL: INFO
+          LOG_LEVEL: !Ref LogLevel
       Timeout: 240
       MemorySize: 512
 
