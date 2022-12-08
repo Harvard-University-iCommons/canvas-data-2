@@ -13,6 +13,13 @@ The application uses several AWS resources, including Lambda functions, SQS queu
 
 ![workflow diagram](canvas-data-2.png)
 
+## Application workflow
+
+1. The `refresh` Lambda function is executed on a schedule (e.g. hourly, daily, etc.). The function fetches the list of tables from the DAP API and sends a message to the `query_table` queue for each table in the list.
+2. The `query_table` Lambda function pulls messages from the `query_table` queue. For each message, the function queries the DynamoDB table to try to find the most recent data lake timestamp for the given Canvas table. If it finds a timestamp, it initiates an incremental query (starting from the timestamp) via the DAP API. If it doesn't find a timestamp, it initiates a snapshot query via the DAP API. For each query job that is initiated it sends a message to the `job_status` queue.
+3. The `job_status` Lambda function pulls messages from the `job_status` queue and calls the DAP API to find the status of the corresponding query job. If the job is still processing, the function sends a new message to the `job_status` queue (to re-check the status in 60 seconds). If the job is complete, the function stores the details (including the data lake timestamp) in the DynamoDB table. For each object in the job it sends a message to the `fetch_object` queue.
+4. The `fetch_object` Lambda function pulls messages from the `fetch_object` queue and downloads the specified object to the S3 bucket.
+
 ## Deploy the canvas-data-2 application
 
 The Serverless Application Model Command Line Interface (SAM CLI) is an extension of the AWS CLI that adds functionality for building and testing Lambda applications. It uses Docker to run your functions in an Amazon Linux environment that matches Lambda. It can also emulate your application's build environment and API.
