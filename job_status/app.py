@@ -48,6 +48,7 @@ metrics = Metrics()
 metrics.set_default_dimensions(environment=env)
 
 
+@metrics.log_metrics
 @logger.inject_lambda_context(log_event=True)
 @event_source(data_class=SQSEvent)
 def lambda_handler(event: SQSEvent, context: LambdaContext):
@@ -92,14 +93,17 @@ def lambda_handler(event: SQSEvent, context: LambdaContext):
 
             else:
 
-                # put the job_status message back on the queue
+                # put a new job_status message in the queue - check again in a bit
                 job_status_queue.send_message(
                     MessageBody=json.dumps(message)
                 )
-                # job_status_message.change_visibility(VisibilityTimeout=60)
                 logger.info(f'job {job_id} (table {table}) not complete - requeued', extra={'table': table, 'status': str(status)})
 
+            # remove the original job_status message from the queue
             job_status_message.delete()
+
+            metrics.add_metric(name=f'status_check', unit=MetricUnit.Count, value=1)
+
 
 
 

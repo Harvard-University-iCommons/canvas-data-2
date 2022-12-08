@@ -48,6 +48,7 @@ metrics = Metrics()
 metrics.set_default_dimensions(environment=env)
 
 
+@metrics.log_metrics
 @logger.inject_lambda_context(log_event=True)
 @event_source(data_class=SQSEvent)
 def lambda_handler(event: SQSEvent, context: LambdaContext):
