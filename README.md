@@ -11,6 +11,8 @@ You can deploy this application to your AWS account with the SAM CLI. It include
 
 The application uses several AWS resources, including Lambda functions, SQS queues, a DynamoDB table, and an S3 bucket. These resources are defined in the `template.yaml` file in this project.
 
+![workflow diagram](canvas-data-2.png)
+
 ## Deploy the canvas-data-2 application
 
 The Serverless Application Model Command Line Interface (SAM CLI) is an extension of the AWS CLI that adds functionality for building and testing Lambda applications. It uses Docker to run your functions in an Amazon Linux environment that matches Lambda. It can also emulate your application's build environment and API.
