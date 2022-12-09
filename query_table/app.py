@@ -114,7 +114,7 @@ def lambda_handler(event: SQSEvent, context: LambdaContext):
 
             query_message = sqs.Message(query_table_queue_url, record.receipt_handle)
             query_message.delete()
-            logger.info('deleted the query_table message')
+            logger.info(f'deleted the query_table message for table {table} job_type {job_type}', extra={'table': table})
 
 
 def get_table_high_water_mark(table_name: str):

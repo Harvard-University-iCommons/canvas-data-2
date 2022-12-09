@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List
 
 import boto3
+from aws_lambda_powertools import Logger
 from aws_lambda_powertools.utilities import parameters
 from aws_lambda_powertools.utilities.data_classes import SQSEvent, event_source
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -56,7 +57,7 @@ def lambda_handler(event: SQSEvent, context: LambdaContext):
             logger.info(f'job status: {object_to_json(status)}')
 
             job_status_message = sqs.Message(job_status_queue_url, record.receipt_handle)
-
+            job_at = None
             if status.isTerminal():
                 job = dc.get_job(job_id)
 
@@ -73,7 +74,12 @@ def lambda_handler(event: SQSEvent, context: LambdaContext):
                             MessageBody=json.dumps(message)
                         )
 
-                    logger.info(f'job {job_id} (table {table}) is complete - sent to fetch_objects queue', extra={'table': table, 'status': str(status)})
+                    if type(job) is CompleteSnapshotJob:
+                        job_at = job.at
+                    elif type(job) is CompleteIncrementalJob:
+                        job_at = job.until
+
+                    logger.info(f'job {job_id} (table {table}) is complete - sent to fetch_objects queue', extra={'table': table, 'status': str(status), 'at': str(job_at)})
                 else:
                     # something went wrong
                     logger.error(f'table query for {table}, type {job_type}, file_format {file_format} failed: {job.error}', extra=message)

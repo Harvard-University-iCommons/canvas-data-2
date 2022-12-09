@@ -1,4 +1,4 @@
-aws-lambda-powertools
-requests
-boto3
-smart-open
+aws-lambda-powertools==2.4.0
+requests==2.28.1
+boto3==1.26.22
+smart-open==6.2.0
