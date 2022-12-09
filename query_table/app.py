@@ -76,7 +76,6 @@ def lambda_handler(event: SQSEvent, context: LambdaContext):
                 # Try to work around a bug in the dap library: if the execute_job call
                 # returns a completed job immediately, the library will fail to deserialize
                 # the response data. Here we'll try to deserialize it as a CompleteSnapshotJob.
-                # TODO: figure out how to recognize when it should be a CompleteIncrementalJob instead.
                 response_payload = inspect.trace()[-1][0].f_locals
                 job_attrs = response_payload['data'] | response_payload['field_values']
                 if job_attrs.get('at'):
