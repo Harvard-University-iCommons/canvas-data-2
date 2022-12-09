@@ -4,8 +4,6 @@ from datetime import datetime
 from typing import List
 
 import boto3
-from aws_lambda_powertools import Logger, Metrics
-from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities import parameters
 from aws_lambda_powertools.utilities.data_classes import SQSEvent, event_source
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -38,11 +36,6 @@ env = os.environ.get('ENV', 'dev')
 api_key_param_path = os.environ.get('API_KEY_PARAM_PATH', f'/{env}/canvas_data_2/dap_api_key')
 api_base_url = os.environ.get('API_BASE_URL', 'https://api-gateway.instructure.com')
 
-metrics = Metrics()
-metrics.set_default_dimensions(environment=env)
-
-
-@metrics.log_metrics
 @logger.inject_lambda_context(log_event=True)
 @event_source(data_class=SQSEvent)
 def lambda_handler(event: SQSEvent, context: LambdaContext):
@@ -95,10 +88,6 @@ def lambda_handler(event: SQSEvent, context: LambdaContext):
 
             # remove the original job_status message from the queue
             job_status_message.delete()
-
-            metrics.add_metric(name=f'status_check', unit=MetricUnit.Count, value=1)
-
-
 
 
 def put_job(table: str, job, file_format: str):
