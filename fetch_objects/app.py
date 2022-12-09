@@ -1,8 +1,5 @@
-import inspect
 import json
 import os
-from datetime import datetime, timezone
-from typing import List
 from urllib.parse import urlparse
 
 import boto3
@@ -12,18 +9,8 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities import parameters
 from aws_lambda_powertools.utilities.data_classes import SQSEvent, event_source
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.dynamodb.conditions import Key
 from botocore.config import Config
-from dap.api import DAPClient
-from dap.dap_error import ProcessingError
-from dap.dap_types import (CompleteIncrementalJob, CompleteJob,
-                           CompleteSnapshotJob, Format, IncrementalQuery, Job,
-                           JobStatus, Object, Resource, SnapshotQuery,
-                           TableJob)
 from smart_open import open
-from strong_typing.exception import JsonKeyError
-from strong_typing.serialization import (json_dump_string, json_to_object,
-                                         object_to_json)
 
 region = os.environ.get('AWS_REGION')
 logger = Logger()

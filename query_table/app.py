@@ -13,12 +13,10 @@ from boto3.dynamodb.conditions import Key
 from botocore.config import Config
 from dap.api import DAPClient
 from dap.dap_error import ProcessingError
-from dap.dap_types import (CompleteIncrementalJob, CompleteJob,
-                           CompleteSnapshotJob, Format, IncrementalQuery, Job,
-                           JobStatus, SnapshotQuery, TableJob)
+from dap.dap_types import (CompleteIncrementalJob, CompleteSnapshotJob, Format,
+                           IncrementalQuery, SnapshotQuery)
 from strong_typing.exception import JsonKeyError
-from strong_typing.serialization import (json_dump_string, json_to_object,
-                                         object_to_json)
+from strong_typing.serialization import json_to_object
 
 region = os.environ.get('AWS_REGION')
 logger = Logger()
@@ -92,7 +90,8 @@ def lambda_handler(event: SQSEvent, context: LambdaContext):
                     logger.info(e.message)
                 else:
                     logger.exception(f'failed to query table {table}, format {file_format}, type {job_type}: {e.message}')
-                    raise e
+                    # may need to add some more robust error handling here
+                    # if a table's data in the DAP has not been updated in more than 7 days, an incremental query will fail
 
             if job:
                 if job.id == prior_job_id:
