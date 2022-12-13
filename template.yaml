@@ -126,7 +126,7 @@ Resources:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt QueryTableQueue.QueueName
         - SSMParameterReadPolicy:
-            ParameterName: !If [OverrideApiKeyParamPath, !Ref ApiKeyParamPath, !Sub '/${EnvironmentParameter}/canvas_data_2/dap_api_key']
+            ParameterName: !If [OverrideApiKeyParamPath, !Ref ApiKeyParamPath, !Sub '${EnvironmentParameter}/canvas_data_2/dap_api_key']
       Environment:
         Variables:
           DDB_TABLE_NAME: !Ref JobTable
@@ -161,7 +161,7 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref JobTable
         - SSMParameterReadPolicy:
-            ParameterName: !If [OverrideApiKeyParamPath, !Ref ApiKeyParamPath, !Sub '/${EnvironmentParameter}/canvas_data_2/dap_api_key']
+            ParameterName: !If [OverrideApiKeyParamPath, !Ref ApiKeyParamPath, !Sub '${EnvironmentParameter}/canvas_data_2/dap_api_key']
       Environment:
         Variables:
           DDB_TABLE_NAME: !Ref JobTable
@@ -201,7 +201,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref JobTable
         - SSMParameterReadPolicy:
-            ParameterName: !If [OverrideApiKeyParamPath, !Ref ApiKeyParamPath, !Sub '/${EnvironmentParameter}/canvas_data_2/dap_api_key']
+            ParameterName: !If [OverrideApiKeyParamPath, !Ref ApiKeyParamPath, !Sub '${EnvironmentParameter}/canvas_data_2/dap_api_key']
       Environment:
         Variables:
           DDB_TABLE_NAME: !Ref JobTable
